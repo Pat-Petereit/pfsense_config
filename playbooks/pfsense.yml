@@ -1,0 +1,73 @@
+---
+- hosts: pfsense
+  gather_facts: false
+  become: true
+  #connection: paramiko
+  tasks:
+  - name: Add adservers alias
+    pfsensible.core.pfsense_alias:
+      name: adservers
+      address: 10.1.3.1
+      descr: WindowsADServer
+      type: host
+      state: present
+
+  - name: Add container alias
+    pfsensible.core.pfsense_alias:
+      name: container
+      address: 10.1.6.3 10.1.6.4
+      type: host
+      state: present    
+  - name: Add plex alias
+    pfsensible.core.pfsense_alias:
+      name: plex
+      address: 10.1.6.4
+      type: host
+      state: present    
+  - name: Add gateway
+    pfsensible.core.pfsense_gateway:
+      name: Fritzbox_GW
+      interface: WAN
+      gateway: 95.143.49.209
+      state: present  
+  - name: Configure Wan Interface
+    pfsensible.core.pfsense_interface:
+      descr: WAN
+      interface: igb0
+      enable: true
+      blockbogons: true
+      blockpriv: true
+      ipv4_type: static
+      ipv4_address: 95.143.49.210
+      ipv4_prefixlen: 29
+      ipv4_gateway: Fritzbox_GW
+
+  - name: "Add HTTPS NAT"
+    pfsensible.core.pfsense_nat_port_forward:
+      descr: 'HTTPS'
+      interface: wan
+      source: any
+      destination: any:443
+      target: container:443
+      associated_rule: pass
+      state: present  
+  - name: "Add Plex NAT"
+    pfsensible.core.pfsense_nat_port_forward:
+      descr: 'PLEX'
+      interface: wan
+      source: any
+      destination: any:32400
+      target: plex:32400
+      protocol: tcp/udp
+      associated_rule: pass
+      state: present
+  - name: "Allow inbound port range"
+    pfsensible.core.pfsense_rule:
+      name: 'Allow inbound port range'
+      action: pass
+      interface: wan
+      protocol: tcp/udp
+      source: any
+      destination: any
+      destination_port: 32400
+      state: present
